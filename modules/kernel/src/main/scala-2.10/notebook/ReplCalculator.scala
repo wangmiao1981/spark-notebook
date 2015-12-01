@@ -364,7 +364,10 @@ class ReplCalculator(
       val result = scala.concurrent.Future {
         // this future is required to allow InterruptRequest messages to be received and process
         // so that spark jobs can be killed and the hand given back to the user to refine their tasks
-        val result = repl.evaluate(newCode, msg => thisSender ! StreamResponse(msg, "stdout"))
+        val result = repl.evaluate( newCode,
+                                    msg => thisSender ! StreamResponse(msg, "stdout"),
+                                    (xy, z) => thisSender ! DefinitionResponse(xy, z)
+                                  )
         val d = toCoarsest(Duration(System.currentTimeMillis - start, MILLISECONDS))
         (d, result._1)
       }
