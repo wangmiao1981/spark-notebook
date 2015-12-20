@@ -113,31 +113,47 @@ return new function () {
 
 
 
-  this.makeObservableHelper = function (id, kind, initialValue) {
+  this.makeObservableHelper = function (id, kind, initialValue, df) {
+    var _df = df
+    if (_.isUndefined(_df)) {
+      _df = function(publishValue) {
+        this.df.done(function(ob) {
+          ob(publishValue);
+        });
+      }
+      _df.df = $.Deferred();
+      _df.subscribe = function(subscriber) {
+        this.df.done(function(ob) {
+          ob.subscribe(subscriber);
+        });
+      };
+    }
     if(!this.isInitialized()) {
       // in case the Observable isn't initialized, we differ the creation of the observable
       var args = Array.prototype.slice.call(arguments);
       var me = this;
+      var current_df = _df;
       console.warn("Delaying the creation of Observable (" + args.join(",") + ") since Observable isn't initialized yet");
       console.log("Observable not initialized:", me);
       events.on('Observable.ready', function() {
-        me.makeObservableHelper.apply(me, args);
+        me.makeObservableHelper.apply(me, args, current_df);
       });
-      return;
-    }
-    var observable = this.observables[id];
-    if (typeof observable === 'undefined') {
-    	console.log("Creating new observable (client request): " + id)
-      observable = ko[kind](initialValue);
-      this.register_observable(id, observable);
-    } else if (typeof initialValue !== 'undefined') {
-      this.observableSetIfChanged(observable, initialValue);
     } else {
-      console.error("Cannot register observable with id '" + id + "', kind '" + kind + "'" + "', initialValue '" + initialValue + "'")
-      console.log("Observable is ", this);
-      console.log("Registered observables are ", this.observables);
+      var observable = this.observables[id];
+      if (typeof observable === 'undefined') {
+      	console.log("Creating new observable (client request): " + id)
+        observable = ko[kind](initialValue);
+        this.register_observable(id, observable);
+      } else if (typeof initialValue !== 'undefined') {
+        this.observableSetIfChanged(observable, initialValue);
+      } else {
+        console.error("Cannot register observable with id '" + id + "', kind '" + kind + "'" + "', initialValue '" + initialValue + "'")
+        console.log("Observable is ", this);
+        console.log("Registered observables are ", this.observables);
+      }
+      _df.df = _df.df.resolve(observable);
     }
-    return observable;
+    return _df;
   };
 
   this.observableSetIfChanged = function (observable, newValue) {
