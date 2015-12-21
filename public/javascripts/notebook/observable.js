@@ -1,5 +1,29 @@
 define(['jquery', 'base/js/events', 'knockout', 'equiv', 'underscore'], function ($, events, ko, equiv, _) {
+ko.extenders.async = function(computedDeferred, initialValue) {
+    var plainObservable = ko.observable(initialValue), currentDeferred;
+    plainObservable.inProgress = ko.observable(false);
 
+    ko.computed(function() {
+        if (currentDeferred) {
+            currentDeferred.reject();
+            currentDeferred = null;
+        }
+
+        var newDeferred = computedDeferred();
+        if (newDeferred && (typeof newDeferred.done == "function")) {
+            plainObservable.inProgress(true);
+            currentDeferred = $.Deferred().done(function(data) {
+                plainObservable.inProgress(false);
+                plainObservable(data);
+            });
+            newDeferred.done(currentDeferred.resolve);
+        } else {
+            plainObservable(newDeferred);
+        }
+    });
+
+    return plainObservable;
+};
 return new function () {
 
   this.observables = {};
@@ -111,50 +135,35 @@ return new function () {
 
   };
 
+  this.makeObservableHelper = function (id, kind, initialValue) {
+    var observable = this.observables[id];
+    if (typeof observable === 'undefined') {
+    	console.log("Creating new observable (client request): " + id)
+      observable = ko[kind](initialValue);
 
-
-  this.makeObservableHelper = function (id, kind, initialValue, df) {
-    var _df = df
-    if (_.isUndefined(_df)) {
-      _df = function(publishValue) {
-        this.df.done(function(ob) {
-          ob(publishValue);
+      if(!this.isInitialized()) {
+        // in case the Observable isn't initialized, we differ the creation of the observable
+        var me = this;
+        var lid = id;
+        var ob = observable;
+        console.warn("Delaying the registration of Observable (" + id + ") since Observable isn't initialized yet");
+        console.log("Observable not registered:", observable);
+        events.on('Observable.ready', function() {
+          console.warn("Registering observable:" + lid)
+          console.log("Observable:" + ob)
+          me.register_observable(lid, ob);
         });
-      }
-      _df.df = $.Deferred();
-      _df.subscribe = function(subscriber) {
-        this.df.done(function(ob) {
-          ob.subscribe(subscriber);
-        });
-      };
-    }
-    if(!this.isInitialized()) {
-      // in case the Observable isn't initialized, we differ the creation of the observable
-      var args = Array.prototype.slice.call(arguments);
-      var me = this;
-      args.push(_df);
-      console.warn("Delaying the creation of Observable (" + args.join(",") + ") since Observable isn't initialized yet");
-      console.log("Observable not initialized:", me);
-      events.on('Observable.ready', function() {
-        args
-        me.makeObservableHelper.apply(me, args);
-      });
-    } else {
-      var observable = this.observables[id];
-      if (typeof observable === 'undefined') {
-      	console.log("Creating new observable (client request): " + id)
-        observable = ko[kind](initialValue);
-        this.register_observable(id, observable);
-      } else if (typeof initialValue !== 'undefined') {
-        this.observableSetIfChanged(observable, initialValue);
       } else {
-        console.error("Cannot register observable with id '" + id + "', kind '" + kind + "'" + "', initialValue '" + initialValue + "'")
-        console.log("Observable is ", this);
-        console.log("Registered observables are ", this.observables);
+        this.register_observable(id, observable);
       }
-      _df.df = _df.df.resolve(observable);
+    } else if (typeof initialValue !== 'undefined') {
+      this.observableSetIfChanged(observable, initialValue);
+    } else {
+      console.error("Cannot register observable with id '" + id + "', kind '" + kind + "'" + "', initialValue '" + initialValue + "'")
+      console.log("Observable is ", this);
+      console.log("Registered observables are ", this.observables);
     }
-    return _df;
+    return observable;
   };
 
   this.observableSetIfChanged = function (observable, newValue) {
@@ -170,7 +179,6 @@ return new function () {
   this.makeObservableArray = function (id, initialValue) {
     return this.makeObservableHelper(id, 'observableArray', initialValue);
   };
-
 
   ko.observable.fn.noEcho = function () {
     var obs = this;
