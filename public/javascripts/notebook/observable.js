@@ -132,11 +132,12 @@ return new function () {
       // in case the Observable isn't initialized, we differ the creation of the observable
       var args = Array.prototype.slice.call(arguments);
       var me = this;
-      var current_df = _df;
+      args.push(_df);
       console.warn("Delaying the creation of Observable (" + args.join(",") + ") since Observable isn't initialized yet");
       console.log("Observable not initialized:", me);
       events.on('Observable.ready', function() {
-        me.makeObservableHelper.apply(me, args, current_df);
+        args
+        me.makeObservableHelper.apply(me, args);
       });
     } else {
       var observable = this.observables[id];
