@@ -117,16 +117,29 @@ return new function () {
     var _df = df
     if (_.isUndefined(_df)) {
       _df = function(publishValue) {
-        this.df.done(function(ob) {
+        _df.df.done(function(ob) {
           ob(publishValue);
         });
       }
       _df.df = $.Deferred();
       _df.subscribe = function(subscriber) {
-        this.df.done(function(ob) {
+        _df.df.done(function(ob) {
           ob.subscribe(subscriber);
         });
       };
+      // hacky, but works: http://stackoverflow.com/a/19776683
+      _df.extend = function(new_fields) {
+        for (var i in new_fields) {
+          if (new_fields.hasOwnProperty(i)) {
+            _df[i] = new_fields[i];
+          }
+        }
+        return _df
+      }
+      console.log("observable _df:", _df)
+      console.log("observable _df.df:", _df.df)
+      console.log("observable _df.subscribe:", _df.subscribe)
+      console.log("observable _df.extend:", _df.extend)
     }
     if(!this.isInitialized()) {
       // in case the Observable isn't initialized, we differ the creation of the observable
@@ -136,7 +149,6 @@ return new function () {
       console.warn("Delaying the creation of Observable (" + args.join(",") + ") since Observable isn't initialized yet");
       console.log("Observable not initialized:", me);
       events.on('Observable.ready', function() {
-        args
         me.makeObservableHelper.apply(me, args);
       });
     } else {
