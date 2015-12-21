@@ -1,4 +1,4 @@
-define(['jquery', 'base/js/events', 'knockout', 'equiv'], function ($, events, ko, equiv) {
+define(['jquery', 'base/js/events', 'knockout', 'equiv', 'underscore'], function ($, events, ko, equiv, _) {
 
 return new function () {
 
